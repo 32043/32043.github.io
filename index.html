@@ -14,17 +14,18 @@
             padding: 0;
         }
 
-        /* ヘッダー（上部の検索バー）固定 */
+        /* ヘッダー固定 */
         header {
             position: sticky;
             top: 0;
             background-color: #0f0f0f;
             display: flex;
-            justify-content: center;
+            flex-direction: column;
             align-items: center;
             padding: 15px 20px;
             border-bottom: 1px solid #222;
             z-index: 100;
+            gap: 10px;
         }
 
         .search-box {
@@ -65,12 +66,40 @@
             background-color: #272727;
         }
 
-        /* 検索ボタン内の画像サイズ調整 & 黒いアイコンを白く反転 */
         button img {
             width: 20px;
             height: 20px;
             object-fit: contain;
             filter: invert(1);
+        }
+
+        /* チャンネル絞り込みフィルターエリア */
+        #filter-container {
+            display: none; /* 検索前は非表示 */
+            width: 100%;
+            max-width: 1200px;
+            overflow-x: auto;
+            white-space: nowrap;
+            padding-bottom: 5px;
+            gap: 8px;
+        }
+
+        .filter-chip {
+            background-color: #272727;
+            color: #fff;
+            border: none;
+            border-radius: 16px;
+            padding: 6px 14px;
+            font-size: 13px;
+            cursor: pointer;
+            display: inline-block;
+            margin-right: 8px;
+            transition: background 0.2s;
+        }
+
+        .filter-chip:hover, .filter-chip.active {
+            background-color: #f1f1f1;
+            color: #0f0f0f;
         }
 
         /* メインコンテンツエリア */
@@ -89,7 +118,7 @@
         .video-wrapper {
             position: relative;
             width: 100%;
-            padding-bottom: 56.25%; /* 16:9 アスペクト比 */
+            padding-bottom: 56.25%; /* 16:9 */
             height: 0;
             background: #000;
             border-radius: 12px;
@@ -105,21 +134,19 @@
             border: none;
         }
 
-        /* 動画グリッド（1段につき3つ） */
+        /* 動画グリッド（3列） */
         .grid-container {
             display: grid;
             grid-template-columns: repeat(3, 1fr);
             gap: 20px;
         }
 
-        /* スマホ対応（画面が狭いときは1列にする） */
         @media (max-width: 768px) {
             .grid-container {
                 grid-template-columns: 1fr;
             }
         }
 
-        /* 各動画カード */
         .video-card {
             background-color: #1f1f1f;
             border-radius: 8px;
@@ -134,7 +161,7 @@
             transform: scale(1.02);
         }
 
-        .video-card img {
+        .video-card img.thumb {
             width: 100%;
             aspect-ratio: 16 / 9;
             object-fit: cover;
@@ -142,14 +169,37 @@
 
         .video-info {
             padding: 12px;
+            display: flex;
+            gap: 10px;
+        }
+
+        /* チャンネルの簡易イニシャルアイコン風表示 */
+        .channel-avatar {
+            width: 36px;
+            height: 36px;
+            background-color: #333;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            font-size: 14px;
+            color: #aaa;
+            flex-shrink: 0;
+        }
+
+        .video-text-meta {
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
         }
 
         .video-title {
             font-size: 14px;
             font-weight: 500;
-            margin: 0 0 6px 0;
+            margin: 0 0 4px 0;
             display: -webkit-box;
-            -webkit-line-clamp: 2; /* 2行まで表示して省略 */
+            -webkit-line-clamp: 2;
             -webkit-box-orient: vertical;
             overflow: hidden;
             color: #f1f1f1;
@@ -159,6 +209,9 @@
             font-size: 12px;
             color: #aaa;
             margin: 0;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
         }
 
         .placeholder-text {
@@ -171,7 +224,7 @@
 </head>
 <body>
 
-    <!-- ヘッダー（検索バー） -->
+    <!-- ヘッダー -->
     <header>
         <div class="search-box">
             <input type="text" id="search-input" placeholder="検索">
@@ -179,34 +232,32 @@
                 <img src="public/assets/img/650.png" alt="検索">
             </button>
         </div>
+        <!-- 検索結果のチャンネル絞り込み用チップが表示される場所 -->
+        <div id="filter-container"></div>
     </header>
 
-    <!-- メイン -->
     <main>
-        <!-- 動画再生プレイヤー -->
         <div id="player-container"></div>
-
-        <!-- 検索結果グリッド（3列・スクロール可能） -->
         <div id="results-grid" class="grid-container">
             <div class="placeholder-text">キーワードを入力して検索してください</div>
         </div>
     </main>
 
     <script>
-        // APIキーを設定
         const API_KEY = 'AIzaSyC78z1x-dM3Ve82Wq8hItzIC6BbESNxbhE';
 
         const searchInput = document.getElementById('search-input');
         const searchButton = document.getElementById('search-button');
         const resultsGrid = document.getElementById('results-grid');
         const playerContainer = document.getElementById('player-container');
+        const filterContainer = document.getElementById('filter-container');
+
+        let allFetchedVideos = []; // 取得した全動画データを保持する変数
+        let currentFilterChannel = 'ALL'; // 現在の絞り込み
 
         searchButton.addEventListener('click', performSearch);
-        
         searchInput.addEventListener('keypress', (e) => {
-            if (e.key === 'Enter') {
-                performSearch();
-            }
+            if (e.key === 'Enter') performSearch();
         });
 
         async function performSearch() {
@@ -214,8 +265,9 @@
             if (!query) return;
 
             resultsGrid.innerHTML = '<div class="placeholder-text">検索中...</div>';
+            filterContainer.style.display = 'none';
 
-            const url = `https://www.googleapis.com/youtube/v3/search?part=snippet&q=${encodeURIComponent(query)}&type=video&key=${API_KEY}&maxResults=15`;
+            const url = `https://www.googleapis.com/youtube/v3/search?part=snippet&q=${encodeURIComponent(query)}&type=video&key=${API_KEY}&maxResults=20`;
 
             try {
                 const response = await fetch(url);
@@ -227,18 +279,63 @@
                     return;
                 }
 
-                displayVideos(data.items);
+                allFetchedVideos = data.items || [];
+                currentFilterChannel = 'ALL';
+
+                createChannelFilters(allFetchedVideos);
+                displayVideos(allFetchedVideos);
+
             } catch (err) {
                 console.error(err);
                 alert('通信に失敗しました。');
             }
         }
 
+        // 検索結果に含まれるチャンネル名のリストを作ってボタン（チップ）として配置する
+        function createChannelFilters(items) {
+            filterContainer.innerHTML = '';
+            if (!items || items.length === 0) {
+                filterContainer.style.display = 'none';
+                return;
+            }
+
+            // 重複のないチャンネル名のセットを作る
+            const channels = ['ALL', ...new Set(items.map(item => item.snippet.channelTitle))];
+
+            channels.forEach(channel => {
+                const btn = document.createElement('button');
+                btn.className = `filter-chip ${channel === 'ALL' ? 'active' : ''}`;
+                btn.textContent = channel === 'ALL' ? 'すべて' : channel;
+
+                btn.addEventListener('click', () => {
+                    // アクティブ状態の切り替え
+                    document.querySelectorAll('.filter-chip').forEach(b => b.classList.remove('active'));
+                    btn.classList.add('active');
+
+                    currentFilterChannel = channel;
+                    filterAndDisplayVideos();
+                });
+
+                filterContainer.appendChild(btn);
+            });
+
+            filterContainer.style.display = 'flex';
+        }
+
+        // 選択されたチャンネルで絞り込んで表示する
+        function filterAndDisplayVideos() {
+            let filtered = allFetchedVideos;
+            if (currentFilterChannel !== 'ALL') {
+                filtered = allFetchedVideos.filter(item => item.snippet.channelTitle === currentFilterChannel);
+            }
+            displayVideos(filtered);
+        }
+
         function displayVideos(items) {
             resultsGrid.innerHTML = '';
 
             if (!items || items.length === 0) {
-                resultsGrid.innerHTML = '<div class="placeholder-text">動画が見つかりませんでした</div>';
+                resultsGrid.innerHTML = '<div class="placeholder-text">該当する動画が見つかりませんでした</div>';
                 return;
             }
 
@@ -248,13 +345,19 @@
                 const channelTitle = item.snippet.channelTitle;
                 const thumbnail = item.snippet.thumbnails.medium.url;
 
+                // チャンネル名の頭文字をアイコン風に表示する
+                const initial = channelTitle.charAt(0).toUpperCase();
+
                 const card = document.createElement('div');
                 card.className = 'video-card';
                 card.innerHTML = `
-                    <img src="${thumbnail}" alt="${title}">
+                    <img class="thumb" src="${thumbnail}" alt="${title}">
                     <div class="video-info">
-                        <p class="video-title">${title}</p>
-                        <p class="video-channel">${channelTitle}</p>
+                        <div class="channel-avatar">${initial}</div>
+                        <div class="video-text-meta">
+                            <p class="video-title">${title}</p>
+                            <p class="video-channel">${channelTitle}</p>
+                        </div>
                     </div>
                 `;
 
