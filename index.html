@@ -1,0 +1,274 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>YouTube Search & Player</title>
+    <style>
+        /* YouTubeっぽいダークテーマのデザイン */
+        body {
+            background-color: #0f0f0f;
+            color: #ffffff;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            margin: 0;
+            padding: 0;
+        }
+
+        /* ヘッダー（上部の検索バー）固定 */
+        header {
+            position: sticky;
+            top: 0;
+            background-color: #0f0f0f;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 15px 20px;
+            border-bottom: 1px solid #222;
+            z-index: 100;
+        }
+
+        .search-box {
+            display: flex;
+            width: 100%;
+            max-width: 600px;
+        }
+
+        input[type="text"] {
+            flex: 1;
+            padding: 10px 15px;
+            background-color: #121212;
+            border: 1px solid #303030;
+            border-radius: 40px 0 0 40px;
+            color: #fff;
+            font-size: 16px;
+            outline: none;
+        }
+
+        input[type="text"]:focus {
+            border-color: #1c62b9;
+        }
+
+        button {
+            padding: 0 20px;
+            background-color: #222;
+            border: 1px solid #303030;
+            border-left: none;
+            border-radius: 0 40px 40px 0;
+            color: #fff;
+            cursor: pointer;
+            font-size: 16px;
+        }
+
+        button:hover {
+            background-color: #272727;
+        }
+
+        /* メインコンテンツエリア */
+        main {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        /* プレイヤーエリア */
+        #player-container {
+            margin-bottom: 30px;
+            text-align: center;
+        }
+
+        .video-wrapper {
+            position: relative;
+            width: 100%;
+            padding-bottom: 56.25%; /* 16:9 アスペクト比 */
+            height: 0;
+            background: #000;
+            border-radius: 12px;
+            overflow: hidden;
+        }
+
+        .video-wrapper iframe {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            border: none;
+        }
+
+        /* 動画グリッド（1段につき3つ） */
+        .grid-container {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 20px;
+        }
+
+        /* スマホ対応（画面が狭いときは1列にする） */
+        @media (max-width: 768px) {
+            .grid-container {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        /* 各動画カード */
+        .video-card {
+            background-color: #1f1f1f;
+            border-radius: 8px;
+            overflow: hidden;
+            cursor: pointer;
+            transition: transform 0.2s;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .video-card:hover {
+            transform: scale(1.02);
+        }
+
+        .video-card img {
+            width: 100%;
+            aspect-ratio: 16 / 9;
+            object-fit: cover;
+        }
+
+        .video-info {
+            padding: 12px;
+        }
+
+        .video-title {
+            font-size: 14px;
+            font-weight: 500;
+            margin: 0 0 6px 0;
+            display: -webkit-box;
+            -webkit-line-clamp: 2; /* 2行まで表示して省略 */
+            -webkit-box-orient: vertical;
+            overflow: hidden;
+            color: #f1f1f1;
+        }
+
+        .video-channel {
+            font-size: 12px;
+            color: #aaa;
+            margin: 0;
+        }
+
+        .placeholder-text {
+            text-align: center;
+            color: #777;
+            grid-column: span 3;
+            padding: 40px;
+        }
+    </style>
+</head>
+<body>
+
+    <!-- ヘッダー（検索バー） -->
+    <header>
+        <div class="search-box">
+            <input type="text" id="search-input" placeholder="検索">
+            <button id="search-button">🔍</button>
+        </div>
+    </header>
+
+    <!-- メイン -->
+    <main>
+        <!-- 動画再生プレイヤー（最初は非表示、またはプレースホルダー） -->
+        <div id="player-container">
+            <!-- 動画を選択するとここに iframe が入ります -->
+        </div>
+
+        <!-- 検索結果グリッド（3列・スクロール可能） -->
+        <div id="results-grid" class="grid-container">
+            <div class="placeholder-text">キーワードを入力して検索してください</div>
+        </div>
+    </main>
+
+    <script>
+        // 先ほど取得したAPIキーを設定
+        const API_KEY = 'あなたのAPIキーをここに貼り付け';
+
+        const searchInput = document.getElementById('search-input');
+        const searchButton = document.getElementById('search-button');
+        const resultsGrid = document.getElementById('results-grid');
+        const playerContainer = document.getElementById('player-container');
+
+        // 検索ボタンを押したとき
+        searchButton.addEventListener('click', performSearch);
+        
+        // Enterキーを押したときでも検索できるようにする
+        searchInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                performSearch();
+            }
+        });
+
+        async function performSearch() {
+            const query = searchInput.value.trim();
+            if (!query) return;
+
+            resultsGrid.innerHTML = '<div class="placeholder-text">検索中...</div>';
+
+            const url = `https://www.googleapis.com/youtube/v3/search?part=snippet&q=${encodeURIComponent(query)}&type=video&key=${API_KEY}&maxResults=15`;
+
+            try {
+                const response = await fetch(url);
+                const data = await response.json();
+
+                if (data.error) {
+                    alert('エラー: ' + data.error.message);
+                    resultsGrid.innerHTML = '<div class="placeholder-text">エラーが発生しました</div>';
+                    return;
+                }
+
+                displayVideos(data.items);
+            } catch (err) {
+                console.error(err);
+                alert('通信に失敗しました。');
+            }
+        }
+
+        function displayVideos(items) {
+            resultsGrid.innerHTML = '';
+
+            if (!items || items.length === 0) {
+                resultsGrid.innerHTML = '<div class="placeholder-text">動画が見つかりませんでした</div>';
+                return;
+            }
+
+            items.forEach(item => {
+                const videoId = item.id.videoId;
+                const title = item.snippet.title;
+                const channelTitle = item.snippet.channelTitle;
+                const thumbnail = item.snippet.thumbnails.medium.url;
+
+                // カード要素の作成
+                const card = document.createElement('div');
+                card.className = 'video-card';
+                card.innerHTML = `
+                    <img src="${thumbnail}" alt="${title}">
+                    <div class="video-info">
+                        <p class="video-title">${title}</p>
+                        <p class="video-channel">${channelTitle}</p>
+                    </div>
+                `;
+
+                // クリックされたら上部のプレイヤーに埋め込んで再生
+                card.addEventListener('click', () => {
+                    playerContainer.innerHTML = `
+                        <div class="video-wrapper">
+                            <iframe src="https://www.youtube.com/embed/${videoId}?autoplay=1" 
+                                title="YouTube video player" 
+                                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" 
+                                allowfullscreen>
+                            </iframe>
+                        </div>
+                    `;
+                    // 再生位置まで画面をスムーズにスクロール
+                    window.scrollTo({ top: 0, behavior: 'smooth' });
+                });
+
+                resultsGrid.appendChild(card);
+            });
+        }
+    </script>
+</body>
+</html>
