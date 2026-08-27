@@ -56,11 +56,21 @@
             border-radius: 0 40px 40px 0;
             color: #fff;
             cursor: pointer;
-            font-size: 16px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
         }
 
         button:hover {
             background-color: #272727;
+        }
+
+        /* 検索ボタン内の画像サイズ調整 & 黒いアイコンを白く反転 */
+        button img {
+            width: 20px;
+            height: 20px;
+            object-fit: contain;
+            filter: invert(1);
         }
 
         /* メインコンテンツエリア */
@@ -165,16 +175,16 @@
     <header>
         <div class="search-box">
             <input type="text" id="search-input" placeholder="検索">
-            <button id="search-button">🔍</button>
+            <button id="search-button">
+                <img src="public/assets/img/650.png" alt="検索">
+            </button>
         </div>
     </header>
 
     <!-- メイン -->
     <main>
-        <!-- 動画再生プレイヤー（最初は非表示、またはプレースホルダー） -->
-        <div id="player-container">
-            <!-- 動画を選択するとここに iframe が入ります -->
-        </div>
+        <!-- 動画再生プレイヤー -->
+        <div id="player-container"></div>
 
         <!-- 検索結果グリッド（3列・スクロール可能） -->
         <div id="results-grid" class="grid-container">
@@ -183,7 +193,7 @@
     </main>
 
     <script>
-        // 先ほど取得したAPIキーを設定
+        // APIキーを設定
         const API_KEY = 'AIzaSyC78z1x-dM3Ve82Wq8hItzIC6BbESNxbhE';
 
         const searchInput = document.getElementById('search-input');
@@ -191,10 +201,8 @@
         const resultsGrid = document.getElementById('results-grid');
         const playerContainer = document.getElementById('player-container');
 
-        // 検索ボタンを押したとき
         searchButton.addEventListener('click', performSearch);
         
-        // Enterキーを押したときでも検索できるようにする
         searchInput.addEventListener('keypress', (e) => {
             if (e.key === 'Enter') {
                 performSearch();
@@ -240,7 +248,6 @@
                 const channelTitle = item.snippet.channelTitle;
                 const thumbnail = item.snippet.thumbnails.medium.url;
 
-                // カード要素の作成
                 const card = document.createElement('div');
                 card.className = 'video-card';
                 card.innerHTML = `
@@ -251,7 +258,6 @@
                     </div>
                 `;
 
-                // クリックされたら上部のプレイヤーに埋め込んで再生
                 card.addEventListener('click', () => {
                     playerContainer.innerHTML = `
                         <div class="video-wrapper">
@@ -262,7 +268,6 @@
                             </iframe>
                         </div>
                     `;
-                    // 再生位置まで画面をスムーズにスクロール
                     window.scrollTo({ top: 0, behavior: 'smooth' });
                 });
 
