@@ -5,7 +5,6 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>YouTube Search & Player</title>
     <style>
-        /* YouTubeっぽいダークテーマのデザイン */
         body {
             background-color: #0f0f0f;
             color: #ffffff;
@@ -14,7 +13,6 @@
             padding: 0;
         }
 
-        /* ヘッダー固定 */
         header {
             position: sticky;
             top: 0;
@@ -73,9 +71,8 @@
             filter: invert(1);
         }
 
-        /* チャンネル絞り込みフィルターエリア */
         #filter-container {
-            display: none; /* 検索前は非表示 */
+            display: none;
             width: 100%;
             max-width: 1200px;
             overflow-x: auto;
@@ -102,23 +99,29 @@
             color: #0f0f0f;
         }
 
-        /* メインコンテンツエリア */
         main {
-            max-width: 1200px;
+            max-width: 1300px;
             margin: 0 auto;
             padding: 20px;
         }
 
-        /* プレイヤーエリア */
-        #player-container {
-            margin-bottom: 30px;
-            text-align: center;
+        /* 動画再生時の詳細ビュー（左：プレイヤー＆タイトル、右：コメント欄） */
+        #watch-container {
+            display: none; /* 動画選択前は非表示 */
+            grid-template-columns: 1fr 400px;
+            gap: 24px;
+            margin-bottom: 40px;
+        }
+
+        .watch-left {
+            display: flex;
+            flex-direction: column;
         }
 
         .video-wrapper {
             position: relative;
             width: 100%;
-            padding-bottom: 56.25%; /* 16:9 */
+            padding-bottom: 56.25%;
             height: 0;
             background: #000;
             border-radius: 12px;
@@ -134,14 +137,71 @@
             border: none;
         }
 
-        /* 動画グリッド（3列） */
+        .watch-title {
+            font-size: 18px;
+            font-weight: 600;
+            margin: 14px 0 8px 0;
+            color: #f1f1f1;
+        }
+
+        .watch-channel-info {
+            font-size: 14px;
+            color: #aaa;
+            margin-bottom: 16px;
+        }
+
+        /* 右側コメント欄エリア */
+        .watch-right-comments {
+            background-color: #181818;
+            border: 1px solid #282828;
+            border-radius: 12px;
+            padding: 16px;
+            max-height: 550px;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .comments-header {
+            font-size: 16px;
+            font-weight: bold;
+            margin-bottom: 14px;
+            border-bottom: 1px solid #333;
+            padding-bottom: 8px;
+        }
+
+        .comment-item {
+            margin-bottom: 14px;
+            font-size: 13px;
+        }
+
+        .comment-author {
+            font-weight: bold;
+            color: #f1f1f1;
+            margin-bottom: 3px;
+        }
+
+        .comment-text {
+            color: #ccc;
+            margin: 0;
+            line-height: 1.4;
+            word-break: break-all;
+        }
+
+        /* 検索結果グリッド（3列） */
         .grid-container {
             display: grid;
             grid-template-columns: repeat(3, 1fr);
             gap: 20px;
         }
 
-        @media (max-width: 768px) {
+        @media (max-width: 900px) {
+            #watch-container {
+                grid-template-columns: 1fr; /* スマホでは縦並びに変更 */
+            }
+            .watch-right-comments {
+                max-height: 400px;
+            }
             .grid-container {
                 grid-template-columns: 1fr;
             }
@@ -173,7 +233,6 @@
             gap: 10px;
         }
 
-        /* チャンネルの簡易イニシャルアイコン風表示 */
         .channel-avatar {
             width: 36px;
             height: 36px;
@@ -224,7 +283,6 @@
 </head>
 <body>
 
-    <!-- ヘッダー -->
     <header>
         <div class="search-box">
             <input type="text" id="search-input" placeholder="検索">
@@ -232,12 +290,24 @@
                 <img src="public/assets/img/650.png" alt="検索">
             </button>
         </div>
-        <!-- 検索結果のチャンネル絞り込み用チップが表示される場所 -->
         <div id="filter-container"></div>
     </header>
 
     <main>
-        <div id="player-container"></div>
+        <!-- 動画再生＆右側コメント欄ビュー -->
+        <div id="watch-container">
+            <div class="watch-left">
+                <div class="video-wrapper" id="player-wrapper"></div>
+                <div class="watch-title" id="watch-title"></div>
+                <div class="watch-channel-info" id="watch-channel"></div>
+            </div>
+            <div class="watch-right-comments" id="comments-box">
+                <div class="comments-header">コメント</div>
+                <div id="comments-list">読み込み中...</div>
+            </div>
+        </div>
+
+        <!-- 検索結果グリッド -->
         <div id="results-grid" class="grid-container">
             <div class="placeholder-text">キーワードを入力して検索してください</div>
         </div>
@@ -249,11 +319,15 @@
         const searchInput = document.getElementById('search-input');
         const searchButton = document.getElementById('search-button');
         const resultsGrid = document.getElementById('results-grid');
-        const playerContainer = document.getElementById('player-container');
+        const watchContainer = document.getElementById('watch-container');
+        const playerWrapper = document.getElementById('player-wrapper');
+        const watchTitle = document.getElementById('watch-title');
+        const watchChannel = document.getElementById('watch-channel');
+        const commentsList = document.getElementById('comments-list');
         const filterContainer = document.getElementById('filter-container');
 
-        let allFetchedVideos = []; // 取得した全動画データを保持する変数
-        let currentFilterChannel = 'ALL'; // 現在の絞り込み
+        let allFetchedVideos = [];
+        let currentFilterChannel = 'ALL';
 
         searchButton.addEventListener('click', performSearch);
         searchInput.addEventListener('keypress', (e) => {
@@ -291,7 +365,6 @@
             }
         }
 
-        // 検索結果に含まれるチャンネル名のリストを作ってボタン（チップ）として配置する
         function createChannelFilters(items) {
             filterContainer.innerHTML = '';
             if (!items || items.length === 0) {
@@ -299,7 +372,6 @@
                 return;
             }
 
-            // 重複のないチャンネル名のセットを作る
             const channels = ['ALL', ...new Set(items.map(item => item.snippet.channelTitle))];
 
             channels.forEach(channel => {
@@ -308,10 +380,8 @@
                 btn.textContent = channel === 'ALL' ? 'すべて' : channel;
 
                 btn.addEventListener('click', () => {
-                    // アクティブ状態の切り替え
                     document.querySelectorAll('.filter-chip').forEach(b => b.classList.remove('active'));
                     btn.classList.add('active');
-
                     currentFilterChannel = channel;
                     filterAndDisplayVideos();
                 });
@@ -322,7 +392,6 @@
             filterContainer.style.display = 'flex';
         }
 
-        // 選択されたチャンネルで絞り込んで表示する
         function filterAndDisplayVideos() {
             let filtered = allFetchedVideos;
             if (currentFilterChannel !== 'ALL') {
@@ -344,8 +413,6 @@
                 const title = item.snippet.title;
                 const channelTitle = item.snippet.channelTitle;
                 const thumbnail = item.snippet.thumbnails.medium.url;
-
-                // チャンネル名の頭文字をアイコン風に表示する
                 const initial = channelTitle.charAt(0).toUpperCase();
 
                 const card = document.createElement('div');
@@ -361,21 +428,65 @@
                     </div>
                 `;
 
+                // 動画をクリックしたときの動作
                 card.addEventListener('click', () => {
-                    playerContainer.innerHTML = `
-                        <div class="video-wrapper">
-                            <iframe src="https://www.youtube.com/embed/${videoId}?autoplay=1" 
-                                title="YouTube video player" 
-                                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" 
-                                allowfullscreen>
-                            </iframe>
-                        </div>
+                    // 上部のウォッチコンテナを表示
+                    watchContainer.style.display = 'grid';
+                    
+                    // プレイヤーとタイトル、チャンネル名を設定
+                    playerWrapper.innerHTML = `
+                        <iframe src="https://www.youtube.com/embed/${videoId}?autoplay=1" 
+                            title="YouTube video player" 
+                            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" 
+                            allowfullscreen>
+                        </iframe>
                     `;
+                    watchTitle.textContent = title;
+                    watchChannel.textContent = channelTitle;
+
+                    // コメント欄を取得して右側に表示
+                    fetchComments(videoId);
+
                     window.scrollTo({ top: 0, behavior: 'smooth' });
                 });
 
                 resultsGrid.appendChild(card);
             });
+        }
+
+        // YouTubeのコメントを取得する関数
+        async function fetchComments(videoId) {
+            commentsList.innerHTML = '<div style="color: #888; font-size: 13px;">コメントを読み込み中...</div>';
+            const commentUrl = `https://www.googleapis.com/youtube/v3/commentThreads?part=snippet&videoId=${videoId}&key=${API_KEY}&maxResults=15`;
+
+            try {
+                const response = await fetch(commentUrl);
+                const data = await response.json();
+
+                if (data.error || !data.items || data.items.length === 0) {
+                    commentsList.innerHTML = '<div style="color: #888; font-size: 13px;">この動画にはコメントがないか、無効化されています。</div>';
+                    return;
+                }
+
+                commentsList.innerHTML = '';
+                data.items.forEach(item => {
+                    const commentSnippet = item.snippet.topLevelComment.snippet;
+                    const author = commentSnippet.authorDisplayName;
+                    const text = commentSnippet.textDisplay;
+
+                    const commentDiv = document.createElement('div');
+                    commentDiv.className = 'comment-item';
+                    commentDiv.innerHTML = `
+                        <div class="comment-author">${author}</div>
+                        <div class="comment-text">${text}</div>
+                    `;
+                    commentsList.appendChild(commentDiv);
+                });
+
+            } catch (err) {
+                console.error(err);
+                commentsList.innerHTML = '<div style="color: #888; font-size: 13px;">コメントの取得に失敗しました。</div>';
+            }
         }
     </script>
 </body>
