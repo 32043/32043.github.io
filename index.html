@@ -26,10 +26,59 @@
             gap: 10px;
         }
 
+        .header-top {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            width: 100%;
+            max-width: 1200px;
+            flex-wrap: wrap;
+            gap: 10px;
+        }
+
         .search-box {
             display: flex;
-            width: 100%;
+            flex: 1;
             max-width: 600px;
+        }
+
+        /* APIキーを手動で入れられる設定エリア */
+        .api-setting-box {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            background-color: #1a1a1a;
+            padding: 5px 10px;
+            border-radius: 20px;
+            border: 1px solid #333;
+        }
+
+        .api-setting-box input {
+            background: transparent;
+            border: none;
+            color: #fff;
+            font-size: 12px;
+            outline: none;
+            width: 130px;
+        }
+
+        .api-setting-box button {
+            padding: 4px 10px;
+            border-radius: 12px;
+            background-color: #333;
+            border: none;
+            font-size: 11px;
+            border-left: none;
+        }
+
+        /* クォータ残量メーター */
+        .quota-status {
+            font-size: 12px;
+            color: #aaa;
+            background-color: #1a1a1a;
+            padding: 6px 12px;
+            border-radius: 20px;
+            border: 1px solid #333;
         }
 
         input[type="text"] {
@@ -47,7 +96,7 @@
             border-color: #1c62b9;
         }
 
-        button {
+        .search-btn {
             padding: 0 20px;
             background-color: #222;
             border: 1px solid #303030;
@@ -60,11 +109,11 @@
             justify-content: center;
         }
 
-        button:hover {
+        .search-btn:hover {
             background-color: #272727;
         }
 
-        button img {
+        .search-btn img {
             width: 20px;
             height: 20px;
             object-fit: contain;
@@ -105,9 +154,8 @@
             padding: 20px;
         }
 
-        /* 動画再生時の詳細ビュー（左：プレイヤー＆タイトル、右：コメント欄） */
         #watch-container {
-            display: none; /* 動画選択前は非表示 */
+            display: none;
             grid-template-columns: 1fr 400px;
             gap: 24px;
             margin-bottom: 40px;
@@ -150,7 +198,6 @@
             margin-bottom: 16px;
         }
 
-        /* 右側コメント欄エリア */
         .watch-right-comments {
             background-color: #181818;
             border: 1px solid #282828;
@@ -188,7 +235,6 @@
             word-break: break-all;
         }
 
-        /* 検索結果グリッド（3列） */
         .grid-container {
             display: grid;
             grid-template-columns: repeat(3, 1fr);
@@ -197,7 +243,7 @@
 
         @media (max-width: 900px) {
             #watch-container {
-                grid-template-columns: 1fr; /* スマホでは縦並びに変更 */
+                grid-template-columns: 1fr;
             }
             .watch-right-comments {
                 max-height: 400px;
@@ -284,17 +330,30 @@
 <body>
 
     <header>
-        <div class="search-box">
-            <input type="text" id="search-input" placeholder="検索">
-            <button id="search-button">
-                <img src="public/assets/img/650.png" alt="検索">
-            </button>
+        <div class="header-top">
+            <!-- 検索バー -->
+            <div class="search-box">
+                <input type="text" id="search-input" placeholder="検索">
+                <button class="search-btn" id="search-button">
+                    <img src="public/assets/img/650.png" alt="検索">
+                </button>
+            </div>
+
+            <!-- 自分でAPIキーを差し替えできる入力欄 -->
+            <div class="api-setting-box">
+                <input type="password" id="custom-api-key" placeholder="APIキーを変更">
+                <button id="save-key-btn">設定</button>
+            </div>
+
+            <!-- クォータ残量表示カウンター -->
+            <div class="quota-status" id="quota-display">
+                残り枠: 計算中...
+            </div>
         </div>
         <div id="filter-container"></div>
     </header>
 
     <main>
-        <!-- 動画再生＆右側コメント欄ビュー -->
         <div id="watch-container">
             <div class="watch-left">
                 <div class="video-wrapper" id="player-wrapper"></div>
@@ -307,14 +366,55 @@
             </div>
         </div>
 
-        <!-- 検索結果グリッド -->
         <div id="results-grid" class="grid-container">
             <div class="placeholder-text">キーワードを入力して検索してください</div>
         </div>
     </main>
 
     <script>
-        const API_KEY = 'AIzaSyC78z1x-dM3Ve82Wq8hItzIC6BbESNxbhE';
+        // デフォルトのAPIキー
+        let activeApiKey = 'AIzaSyC78z1x-dM3Ve82Wq8hItzIC6BbESNxbhE';
+
+        // ローカルストレージにカスタムキーがあれば優先して読み込む
+        const savedKey = localStorage.getItem('youtube_custom_api_key');
+        if (savedKey) {
+            activeApiKey = savedKey;
+        }
+
+        // クォータ管理（YouTube Data APIの1日上限はデフォルト10,000ユニット。検索は1回約100ユニット、コメント取得は約1ユニット）
+        let usedQuota = parseInt(localStorage.getItem('youtube_used_quota') || '0');
+        const MAX_QUOTA = 10000;
+
+        function updateQuotaDisplay() {
+            const remaining = Math.max(0, MAX_QUOTA - usedQuota);
+            document.getElementById('quota-display').textContent = `残り枠: 約 ${remaining} / ${MAX_QUOTA}`;
+        }
+
+        function consumeQuota(amount) {
+            usedQuota += amount;
+            localStorage.setItem('youtube_used_quota', usedQuota);
+            updateQuotaDisplay();
+        }
+
+        // 初期表示時の残り枠更新
+        updateQuotaDisplay();
+
+        // APIキー変更ボタンの処理
+        document.getElementById('save-key-btn').addEventListener('click', () => {
+            const newKey = document.getElementById('custom-api-key').value.trim();
+            if (newKey) {
+                activeApiKey = newKey;
+                localStorage.setItem('youtube_custom_api_key', newKey);
+                // キーを変えたら使用量もリセット扱いに
+                usedQuota = 0;
+                localStorage.setItem('youtube_used_quota', '0');
+                updateQuotaDisplay();
+                alert('APIキーを更新しました！');
+                document.getElementById('custom-api-key').value = '';
+            } else {
+                alert('有効なAPIキーを入力してください');
+            }
+        });
 
         const searchInput = document.getElementById('search-input');
         const searchButton = document.getElementById('search-button');
@@ -341,7 +441,10 @@
             resultsGrid.innerHTML = '<div class="placeholder-text">検索中...</div>';
             filterContainer.style.display = 'none';
 
-            const url = `https://www.googleapis.com/youtube/v3/search?part=snippet&q=${encodeURIComponent(query)}&type=video&key=${API_KEY}&maxResults=20`;
+            // 検索クエリは1回あたり約100ユニット消費
+            consumeQuota(100);
+
+            const url = `https://www.googleapis.com/youtube/v3/search?part=snippet&q=${encodeURIComponent(query)}&type=video&key=${activeApiKey}&maxResults=20`;
 
             try {
                 const response = await fetch(url);
@@ -349,7 +452,7 @@
 
                 if (data.error) {
                     alert('エラー: ' + data.error.message);
-                    resultsGrid.innerHTML = '<div class="placeholder-text">エラーが発生しました</div>';
+                    resultsGrid.innerHTML = '<div class="placeholder-text">エラーが発生しました（APIキーの制限等をご確認ください）</div>';
                     return;
                 }
 
@@ -428,12 +531,9 @@
                     </div>
                 `;
 
-                // 動画をクリックしたときの動作
                 card.addEventListener('click', () => {
-                    // 上部のウォッチコンテナを表示
                     watchContainer.style.display = 'grid';
                     
-                    // プレイヤーとタイトル、チャンネル名を設定
                     playerWrapper.innerHTML = `
                         <iframe src="https://www.youtube.com/embed/${videoId}?autoplay=1" 
                             title="YouTube video player" 
@@ -444,7 +544,6 @@
                     watchTitle.textContent = title;
                     watchChannel.textContent = channelTitle;
 
-                    // コメント欄を取得して右側に表示
                     fetchComments(videoId);
 
                     window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -454,10 +553,13 @@
             });
         }
 
-        // YouTubeのコメントを取得する関数
         async function fetchComments(videoId) {
             commentsList.innerHTML = '<div style="color: #888; font-size: 13px;">コメントを読み込み中...</div>';
-            const commentUrl = `https://www.googleapis.com/youtube/v3/commentThreads?part=snippet&videoId=${videoId}&key=${API_KEY}&maxResults=15`;
+            
+            // コメント取得も1回あたり約1ユニット消費
+            consumeQuota(1);
+
+            const commentUrl = `https://www.googleapis.com/youtube/v3/commentThreads?part=snippet&videoId=${videoId}&key=${activeApiKey}&maxResults=15`;
 
             try {
                 const response = await fetch(commentUrl);
