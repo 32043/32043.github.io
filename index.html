@@ -3,7 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>YouTube Search & Player (Channel Modal)</title>
+    <title>YouTube Search & Player (Accessible Channel Click)</title>
+    <!-- Supabase クライアントライブラリ -->
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
         body {
@@ -155,8 +156,11 @@
             position: absolute; top: 0; left: 0; width: 100%; height: 100%; border: none;
         }
         .watch-title { font-size: 18px; font-weight: 600; margin: 14px 0 8px 0; color: #f1f1f1; }
-        .watch-channel-info { font-size: 14px; color: #aaa; margin-bottom: 16px; cursor: pointer; display: inline-block; }
-        .watch-channel-info:hover { color: #fff; text-decoration: underline; }
+        .watch-channel-info { 
+            font-size: 14px; color: #aaa; margin-bottom: 16px; cursor: pointer; display: inline-block; 
+            padding: 4px 8px; border-radius: 6px; background-color: #1c1c1c; border: 1px solid #333;
+        }
+        .watch-channel-info:hover { color: #fff; background-color: #2c2c2c; }
         .watch-right-comments {
             background-color: #181818; border: 1px solid #282828; border-radius: 12px;
             padding: 16px; max-height: 550px; overflow-y: auto; display: flex; flex-direction: column;
@@ -168,14 +172,31 @@
         .grid-container { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; }
         .video-card { background-color: #1f1f1f; border-radius: 8px; overflow: hidden; display: flex; flex-direction: column; }
         .video-card img.thumb { width: 100%; aspect-ratio: 16 / 9; object-fit: cover; cursor: pointer; }
-        .video-info { padding: 12px; display: flex; gap: 10px; }
-        .channel-avatar { width: 36px; height: 36px; background-color: #333; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 14px; color: #aaa; flex-shrink: 0; overflow: hidden; cursor: pointer; }
+        .video-info { padding: 12px; display: flex; gap: 12px; align-items: flex-start; }
+        
+        /* チャンネルエリア全体を一つの押しやすいグループにする */
+        .channel-area {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            cursor: pointer;
+            padding: 6px 8px;
+            margin: -6px -8px; /* パディング相殺 */
+            border-radius: 8px;
+            transition: background-color 0.2s;
+        }
+        .channel-area:hover {
+            background-color: rgba(255, 255, 255, 0.08);
+        }
+
+        .channel-avatar { width: 42px; height: 42px; background-color: #333; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 16px; color: #aaa; flex-shrink: 0; overflow: hidden; }
         .channel-avatar img { width: 100%; height: 100%; object-fit: cover; }
-        .video-text-meta { display: flex; flex-direction: column; overflow: hidden; }
+        
+        .video-text-meta { display: flex; flex-direction: column; overflow: hidden; flex: 1; }
         .video-title { font-size: 14px; font-weight: 500; margin: 0 0 4px 0; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; color: #f1f1f1; cursor: pointer; }
         .video-title:hover { color: #3ea6ff; }
-        .video-channel { font-size: 12px; color: #aaa; margin: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; cursor: pointer; }
-        .video-channel:hover { color: #fff; text-decoration: underline; }
+        .video-channel { font-size: 12px; color: #aaa; margin: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        
         .placeholder-text { text-align: center; color: #777; grid-column: span 3; padding: 40px; }
 
         /* チャンネル詳細モーダルウィンドウ */
@@ -235,6 +256,7 @@
             gap: 15px;
             font-size: 13px;
             color: #aaa;
+            flex-wrap: wrap;
         }
         .modal-description {
             font-size: 13px;
@@ -308,6 +330,7 @@
         </div>
     </main>
 
+    <!-- チャンネル詳細モーダル -->
     <div id="channel-modal">
         <div class="modal-content">
             <button class="close-modal" id="close-modal-btn">&times;</button>
@@ -434,7 +457,6 @@
 
         let allFetchedVideos = [];
         let currentFilterChannel = 'ALL';
-        let currentViewingVideo = null;
 
         searchButton.addEventListener('click', handleInput);
         searchInput.addEventListener('keypress', (e) => { if (e.key === 'Enter') handleInput(); });
@@ -543,7 +565,6 @@
         }
 
         async function getChannelThumbnail(channelId) {
-            // ローカルキャッシュがあれば使う
             const cached = localStorage.getItem(`ch_thumb_${channelId}`);
             if (cached) return cached;
 
@@ -576,7 +597,6 @@
                 const channelId = item.snippet.channelId;
                 const thumbnail = item.snippet.thumbnails.medium.url;
 
-                // チャンネルアイコンを取得
                 const thumbUrl = await getChannelThumbnail(channelId);
                 const avatarHtml = thumbUrl ? `<img src="${thumbUrl}" alt="${channelTitle}">` : channelTitle.charAt(0).toUpperCase();
 
@@ -585,25 +605,22 @@
                 card.innerHTML = `
                     <img class="thumb" src="${thumbnail}" alt="${title}">
                     <div class="video-info">
-                        <div class="channel-avatar" title="${channelTitle}の詳細">${avatarHtml}</div>
-                        <div class="video-text-meta">
-                            <p class="video-title" title="${title}">${title}</p>
-                            <p class="video-channel" title="${channelTitle}の詳細">${channelTitle}</p>
+                        <div class="channel-area" title="${channelTitle}の詳細を見る">
+                            <div class="channel-avatar">${avatarHtml}</div>
+                            <div class="video-text-meta">
+                                <p class="video-title" title="${title}">${title}</p>
+                                <p class="video-channel">${channelTitle}</p>
+                            </div>
                         </div>
                     </div>
                 `;
 
-                // サムネイル・タイトルクリックで動画再生
+                // サムネイルとタイトルクリックで動画再生
                 card.querySelector('.thumb').addEventListener('click', () => playVideo(videoId, title, channelTitle, channelId));
                 card.querySelector('.video-title').addEventListener('click', () => playVideo(videoId, title, channelTitle, channelId));
 
-                // チャンネルアイコンやチャンネル名クリックでチャンネル詳細モーダルを開く
-                card.querySelector('.channel-avatar').addEventListener('click', (e) => {
-                    e.stopPropagation();
-                    openChannelModal(channelId, channelTitle);
-                });
-                card.querySelector('.video-channel').addEventListener('click', (e) => {
-                    e.stopPropagation();
+                // チャンネルエリア（アイコン＋名前＋メタ情報を含んだブロック全体）をタップ・クリックでモーダルを開くように変更
+                card.querySelector('.channel-area').addEventListener('click', () => {
                     openChannelModal(channelId, channelTitle);
                 });
 
@@ -628,7 +645,6 @@
             window.scrollTo({ top: 0, behavior: 'smooth' });
         }
 
-        // チャンネル詳細情報を取得してモーダルを表示する関数
         async function openChannelModal(channelId, fallbackName) {
             channelModal.style.display = 'flex';
             document.getElementById('modal-channel-name').textContent = fallbackName;
@@ -658,7 +674,6 @@
                     const videoCount = Number(stats.videoCount).toLocaleString();
                     document.getElementById('modal-stats-text').textContent = `登録者数: ${subCount}人 ／ 総再生回数: ${viewCount}回 ／ 動画数: ${videoCount}本`;
 
-                    // このチャンネルの最近の動画を取得
                     fetchChannelVideos(channelId);
                 } else {
                     document.getElementById('modal-stats-text').textContent = 'チャンネル情報の取得に失敗しました';
@@ -669,9 +684,8 @@
             }
         }
 
-        // チャンネルの最近の動画リストを取得
         async function fetchChannelVideos(channelId) {
-            await consumeQuota(100); // 検索APIを使用
+            await consumeQuota(100);
             const url = `https://www.googleapis.com/youtube/v3/search?part=snippet&channelId=${channelId}&order=date&type=video&key=${activeApiKey}&maxResults=4`;
             const videosGrid = document.getElementById('modal-videos-grid');
 
