@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>YouTube Search & Player (Multi-Key Selector)</title>
+    <title>YouTube Search & Player (Channel Modal)</title>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
         body {
@@ -155,7 +155,8 @@
             position: absolute; top: 0; left: 0; width: 100%; height: 100%; border: none;
         }
         .watch-title { font-size: 18px; font-weight: 600; margin: 14px 0 8px 0; color: #f1f1f1; }
-        .watch-channel-info { font-size: 14px; color: #aaa; margin-bottom: 16px; }
+        .watch-channel-info { font-size: 14px; color: #aaa; margin-bottom: 16px; cursor: pointer; display: inline-block; }
+        .watch-channel-info:hover { color: #fff; text-decoration: underline; }
         .watch-right-comments {
             background-color: #181818; border: 1px solid #282828; border-radius: 12px;
             padding: 16px; max-height: 550px; overflow-y: auto; display: flex; flex-direction: column;
@@ -165,17 +166,103 @@
         .comment-author { font-weight: bold; color: #f1f1f1; margin-bottom: 3px; }
         .comment-text { color: #ccc; margin: 0; word-break: break-all; }
         .grid-container { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; }
-        .video-card { background-color: #1f1f1f; border-radius: 8px; overflow: hidden; cursor: pointer; display: flex; flex-direction: column; }
-        .video-card img.thumb { width: 100%; aspect-ratio: 16 / 9; object-fit: cover; }
+        .video-card { background-color: #1f1f1f; border-radius: 8px; overflow: hidden; display: flex; flex-direction: column; }
+        .video-card img.thumb { width: 100%; aspect-ratio: 16 / 9; object-fit: cover; cursor: pointer; }
         .video-info { padding: 12px; display: flex; gap: 10px; }
-        .channel-avatar { width: 36px; height: 36px; background-color: #333; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 14px; color: #aaa; flex-shrink: 0; }
+        .channel-avatar { width: 36px; height: 36px; background-color: #333; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 14px; color: #aaa; flex-shrink: 0; overflow: hidden; cursor: pointer; }
+        .channel-avatar img { width: 100%; height: 100%; object-fit: cover; }
         .video-text-meta { display: flex; flex-direction: column; overflow: hidden; }
-        .video-title { font-size: 14px; font-weight: 500; margin: 0 0 4px 0; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; color: #f1f1f1; }
-        .video-channel { font-size: 12px; color: #aaa; margin: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .video-title { font-size: 14px; font-weight: 500; margin: 0 0 4px 0; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; color: #f1f1f1; cursor: pointer; }
+        .video-title:hover { color: #3ea6ff; }
+        .video-channel { font-size: 12px; color: #aaa; margin: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; cursor: pointer; }
+        .video-channel:hover { color: #fff; text-decoration: underline; }
         .placeholder-text { text-align: center; color: #777; grid-column: span 3; padding: 40px; }
+
+        /* チャンネル詳細モーダルウィンドウ */
+        #channel-modal {
+            display: none;
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background-color: rgba(0, 0, 0, 0.8);
+            z-index: 1000;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+            box-sizing: border-box;
+        }
+        .modal-content {
+            background-color: #212121;
+            border: 1px solid #333;
+            border-radius: 16px;
+            width: 100%;
+            max-width: 700px;
+            max-height: 90vh;
+            overflow-y: auto;
+            padding: 24px;
+            position: relative;
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+        .close-modal {
+            position: absolute;
+            top: 16px; right: 20px;
+            background: transparent;
+            border: none;
+            color: #aaa;
+            font-size: 24px;
+            cursor: pointer;
+        }
+        .close-modal:hover { color: #fff; }
+        .modal-header {
+            display: flex;
+            align-items: center;
+            gap: 20px;
+        }
+        .modal-avatar {
+            width: 80px; height: 80px;
+            border-radius: 50%;
+            object-fit: cover;
+            background-color: #333;
+        }
+        .modal-meta h2 {
+            margin: 0 0 6px 0;
+            font-size: 20px;
+            color: #fff;
+        }
+        .modal-stats {
+            display: flex;
+            gap: 15px;
+            font-size: 13px;
+            color: #aaa;
+        }
+        .modal-description {
+            font-size: 13px;
+            color: #bbb;
+            background-color: #181818;
+            padding: 12px;
+            border-radius: 8px;
+            max-height: 100px;
+            overflow-y: auto;
+            white-space: pre-wrap;
+            word-break: break-all;
+        }
+        .modal-videos-title {
+            font-size: 16px;
+            font-weight: bold;
+            border-bottom: 1px solid #333;
+            padding-bottom: 8px;
+            margin-bottom: 10px;
+        }
+        .modal-videos-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 12px;
+        }
         @media (max-width: 900px) {
             #watch-container { grid-template-columns: 1fr; }
             .grid-container { grid-template-columns: 1fr; }
+            .modal-videos-grid { grid-template-columns: 1fr; }
         }
     </style>
 </head>
@@ -208,7 +295,7 @@
             <div class="watch-left">
                 <div class="video-wrapper" id="player-wrapper"></div>
                 <div class="watch-title" id="watch-title"></div>
-                <div class="watch-channel-info" id="watch-channel"></div>
+                <div class="watch-channel-info" id="watch-channel">チャンネル情報を読み込み中...</div>
             </div>
             <div class="watch-right-comments" id="comments-box">
                 <div class="comments-header">コメント</div>
@@ -221,20 +308,35 @@
         </div>
     </main>
 
+    <div id="channel-modal">
+        <div class="modal-content">
+            <button class="close-modal" id="close-modal-btn">&times;</button>
+            <div class="modal-header">
+                <img id="modal-avatar" class="modal-avatar" src="" alt="アイコン">
+                <div class="modal-meta">
+                    <h2 id="modal-channel-name">チャンネル名</h2>
+                    <div class="modal-stats" id="modal-stats-text">登録者数: - / 再生回数: -</div>
+                </div>
+            </div>
+            <div class="modal-description" id="modal-desc">説明文なし</div>
+            <div>
+                <div class="modal-videos-title">このチャンネルの最近の動画</div>
+                <div class="modal-videos-grid" id="modal-videos-grid">読み込み中...</div>
+            </div>
+        </div>
+    </div>
+
     <script>
-        // Supabase の接続情報
         const SUPABASE_URL = 'https://ocdsoyiwtrmszhrxunlp.supabase.co';
         const SUPABASE_ANON_KEY = 'sb_publishable_pCr70-GWTlUqTgztEy3etw_xdXa3Fta';
         const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-        // デフォルトの3つのAPIキー
         const defaultApiKeys = [
             'AIzaSyDAzdoUdu5dbttA45r2L3DDUoK-3dsclzo',
             'AIzaSyClEDJSaDPk_Y76JH1xDxKd7vA2Bra_d24',
             'AIzaSyDgu8NNPC9UJtYF6fvupEvLMa6sJJmqaKI'
         ];
 
-        // ローカルストレージからカスタム追加されたキーがあれば結合、なければデフォルトのみ
         let storedCustomKeys = JSON.parse(localStorage.getItem('youtube_all_custom_keys') || '[]');
         let allApiKeys = [...new Set([...defaultApiKeys, ...storedCustomKeys])];
 
@@ -244,25 +346,20 @@
 
         const apiKeySelect = document.getElementById('api-key-select');
 
-        // プルダウンの選択肢を再構築する関数
         function updateApiKeyDropdown() {
             apiKeySelect.innerHTML = '';
             allApiKeys.forEach((key, index) => {
                 const option = document.createElement('option');
                 option.value = key;
-                // キーの一部（最初と最後）を表示名として分かりやすくする
                 const maskedKey = `${key.substring(0, 6)}...${key.substring(key.length - 4)}`;
                 option.textContent = `Key ${index + 1} (${maskedKey})`;
-                if (key === activeApiKey) {
-                    option.selected = true;
-                }
+                if (key === activeApiKey) option.selected = true;
                 apiKeySelect.appendChild(option);
             });
         }
 
-        // Supabaseから現在選択中のAPIキーの消費量を取得する
         async function fetchQuotaFromSupabase() {
-            const { data, error } = await supabaseClient
+            const { data } = await supabaseClient
                 .from('api_quotas')
                 .select('used_quota')
                 .eq('api_key', activeApiKey)
@@ -277,7 +374,6 @@
             updateQuotaDisplay();
         }
 
-        // Supabaseの消費量を更新する
         async function consumeQuota(amount) {
             currentUsedQuota += amount;
             updateQuotaDisplay();
@@ -292,18 +388,15 @@
             document.getElementById('quota-display').textContent = `残り枠: 約 ${remaining} / ${MAX_QUOTA}`;
         }
 
-        // 初期化実行
         updateApiKeyDropdown();
         fetchQuotaFromSupabase();
 
-        // プルダウンでキーが変更されたとき
         apiKeySelect.addEventListener('change', async (e) => {
             activeApiKey = e.target.value;
             localStorage.setItem('youtube_active_api_key', activeApiKey);
             await fetchQuotaFromSupabase();
         });
 
-        // 新しいAPIキーを追加するボタンの処理
         document.getElementById('add-key-btn').addEventListener('click', async () => {
             const newKey = document.getElementById('custom-api-key').value.trim();
             if (newKey) {
@@ -315,7 +408,6 @@
                 activeApiKey = newKey;
                 localStorage.setItem('youtube_active_api_key', activeApiKey);
                 document.getElementById('custom-api-key').value = '';
-
                 updateApiKeyDropdown();
                 await fetchQuotaFromSupabase();
                 alert('新しいAPIキーを追加して選択しました！');
@@ -334,13 +426,18 @@
         const commentsList = document.getElementById('comments-list');
         const filterContainer = document.getElementById('filter-container');
 
+        const channelModal = document.getElementById('channel-modal');
+        const closeModalBtn = document.getElementById('close-modal-btn');
+
+        closeModalBtn.addEventListener('click', () => { channelModal.style.display = 'none'; });
+        window.addEventListener('click', (e) => { if (e.target === channelModal) channelModal.style.display = 'none'; });
+
         let allFetchedVideos = [];
         let currentFilterChannel = 'ALL';
+        let currentViewingVideo = null;
 
         searchButton.addEventListener('click', handleInput);
-        searchInput.addEventListener('keypress', (e) => {
-            if (e.key === 'Enter') handleInput();
-        });
+        searchInput.addEventListener('keypress', (e) => { if (e.key === 'Enter') handleInput(); });
 
         function extractYouTubeVideoId(input) {
             const regExp = /^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|\&v=)([^#\&\?]*).*/;
@@ -373,7 +470,8 @@
                 </iframe>
             `;
             watchTitle.textContent = `直リンク再生 (${urlText})`;
-            watchChannel.textContent = '直接入力されたURL';
+            watchChannel.textContent = '直接入力されたURL（チャンネル情報なし）';
+            watchChannel.onclick = null;
 
             fetchComments(videoId);
             window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -444,7 +542,26 @@
             displayVideos(filtered);
         }
 
-        function displayVideos(items) {
+        async function getChannelThumbnail(channelId) {
+            // ローカルキャッシュがあれば使う
+            const cached = localStorage.getItem(`ch_thumb_${channelId}`);
+            if (cached) return cached;
+
+            await consumeQuota(1);
+            const url = `https://www.googleapis.com/youtube/v3/channels?part=snippet&id=${channelId}&key=${activeApiKey}`;
+            try {
+                const res = await fetch(url);
+                const data = await res.json();
+                if (data.items && data.items.length > 0) {
+                    const thumbUrl = data.items[0].snippet.thumbnails.default.url;
+                    localStorage.setItem(`ch_thumb_${channelId}`, thumbUrl);
+                    return thumbUrl;
+                }
+            } catch (e) { console.error(e); }
+            return null;
+        }
+
+        async function displayVideos(items) {
             resultsGrid.innerHTML = '';
 
             if (!items || items.length === 0) {
@@ -452,44 +569,141 @@
                 return;
             }
 
-            items.forEach(item => {
+            for (const item of items) {
                 const videoId = item.id.videoId;
                 const title = item.snippet.title;
                 const channelTitle = item.snippet.channelTitle;
+                const channelId = item.snippet.channelId;
                 const thumbnail = item.snippet.thumbnails.medium.url;
-                const initial = channelTitle.charAt(0).toUpperCase();
+
+                // チャンネルアイコンを取得
+                const thumbUrl = await getChannelThumbnail(channelId);
+                const avatarHtml = thumbUrl ? `<img src="${thumbUrl}" alt="${channelTitle}">` : channelTitle.charAt(0).toUpperCase();
 
                 const card = document.createElement('div');
                 card.className = 'video-card';
                 card.innerHTML = `
                     <img class="thumb" src="${thumbnail}" alt="${title}">
                     <div class="video-info">
-                        <div class="channel-avatar">${initial}</div>
+                        <div class="channel-avatar" title="${channelTitle}の詳細">${avatarHtml}</div>
                         <div class="video-text-meta">
-                            <p class="video-title">${title}</p>
-                            <p class="video-channel">${channelTitle}</p>
+                            <p class="video-title" title="${title}">${title}</p>
+                            <p class="video-channel" title="${channelTitle}の詳細">${channelTitle}</p>
                         </div>
                     </div>
                 `;
 
-                card.addEventListener('click', () => {
-                    watchContainer.style.display = 'grid';
-                    playerWrapper.innerHTML = `
-                        <iframe src="https://www.youtube.com/embed/${videoId}?autoplay=1" 
-                            title="YouTube video player" 
-                            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" 
-                            allowfullscreen>
-                        </iframe>
-                    `;
-                    watchTitle.textContent = title;
-                    watchChannel.textContent = channelTitle;
+                // サムネイル・タイトルクリックで動画再生
+                card.querySelector('.thumb').addEventListener('click', () => playVideo(videoId, title, channelTitle, channelId));
+                card.querySelector('.video-title').addEventListener('click', () => playVideo(videoId, title, channelTitle, channelId));
 
-                    fetchComments(videoId);
-                    window.scrollTo({ top: 0, behavior: 'smooth' });
+                // チャンネルアイコンやチャンネル名クリックでチャンネル詳細モーダルを開く
+                card.querySelector('.channel-avatar').addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    openChannelModal(channelId, channelTitle);
+                });
+                card.querySelector('.video-channel').addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    openChannelModal(channelId, channelTitle);
                 });
 
                 resultsGrid.appendChild(card);
-            });
+            }
+        }
+
+        function playVideo(videoId, title, channelTitle, channelId) {
+            watchContainer.style.display = 'grid';
+            playerWrapper.innerHTML = `
+                <iframe src="https://www.youtube.com/embed/${videoId}?autoplay=1" 
+                    title="YouTube video player" 
+                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" 
+                    allowfullscreen>
+                </iframe>
+            `;
+            watchTitle.textContent = title;
+            watchChannel.textContent = channelTitle;
+            watchChannel.onclick = () => openChannelModal(channelId, channelTitle);
+
+            fetchComments(videoId);
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        }
+
+        // チャンネル詳細情報を取得してモーダルを表示する関数
+        async function openChannelModal(channelId, fallbackName) {
+            channelModal.style.display = 'flex';
+            document.getElementById('modal-channel-name').textContent = fallbackName;
+            document.getElementById('modal-avatar').src = '';
+            document.getElementById('modal-stats-text').textContent = 'データを読み込み中...';
+            document.getElementById('modal-desc').textContent = '読み込み中...';
+            document.getElementById('modal-videos-grid').innerHTML = '<div style="color:#777; font-size:13px;">動画を読み込み中...</div>';
+
+            await consumeQuota(1);
+            const url = `https://www.googleapis.com/youtube/v3/channels?part=snippet,statistics,brandingSettings&id=${channelId}&key=${activeApiKey}`;
+
+            try {
+                const res = await fetch(url);
+                const data = await res.json();
+
+                if (data.items && data.items.length > 0) {
+                    const ch = data.items[0];
+                    const snippet = ch.snippet;
+                    const stats = ch.statistics;
+
+                    document.getElementById('modal-channel-name').textContent = snippet.title;
+                    document.getElementById('modal-avatar').src = snippet.thumbnails.high ? snippet.thumbnails.high.url : snippet.thumbnails.default.url;
+                    document.getElementById('modal-desc').textContent = snippet.description || '説明文はありません。';
+
+                    const subCount = Number(stats.subscriberCount).toLocaleString();
+                    const viewCount = Number(stats.viewCount).toLocaleString();
+                    const videoCount = Number(stats.videoCount).toLocaleString();
+                    document.getElementById('modal-stats-text').textContent = `登録者数: ${subCount}人 ／ 総再生回数: ${viewCount}回 ／ 動画数: ${videoCount}本`;
+
+                    // このチャンネルの最近の動画を取得
+                    fetchChannelVideos(channelId);
+                } else {
+                    document.getElementById('modal-stats-text').textContent = 'チャンネル情報の取得に失敗しました';
+                }
+            } catch (err) {
+                console.error(err);
+                document.getElementById('modal-stats-text').textContent = '通信エラーが発生しました';
+            }
+        }
+
+        // チャンネルの最近の動画リストを取得
+        async function fetchChannelVideos(channelId) {
+            await consumeQuota(100); // 検索APIを使用
+            const url = `https://www.googleapis.com/youtube/v3/search?part=snippet&channelId=${channelId}&order=date&type=video&key=${activeApiKey}&maxResults=4`;
+            const videosGrid = document.getElementById('modal-videos-grid');
+
+            try {
+                const res = await fetch(url);
+                const data = await res.json();
+
+                if (data.items && data.items.length > 0) {
+                    videosGrid.innerHTML = '';
+                    data.items.forEach(item => {
+                        const vid = item.id.videoId;
+                        const vtitle = item.snippet.title;
+                        const vthumb = item.snippet.thumbnails.medium.url;
+
+                        const vCard = document.createElement('div');
+                        vCard.className = 'video-card';
+                        vCard.innerHTML = `
+                            <img class="thumb" src="${vthumb}" alt="${vtitle}" style="aspect-ratio:16/9; object-fit:cover; cursor:pointer;">
+                            <div style="padding: 8px; font-size: 12px; color: #ddd; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; cursor:pointer;">${vtitle}</div>
+                        `;
+                        vCard.addEventListener('click', () => {
+                            channelModal.style.display = 'none';
+                            playVideo(vid, vtitle, item.snippet.channelTitle, channelId);
+                        });
+                        videosGrid.appendChild(vCard);
+                    });
+                } else {
+                    videosGrid.innerHTML = '<div style="color:#777; font-size:13px;">動画が見つかりませんでした。</div>';
+                }
+            } catch (e) {
+                videosGrid.innerHTML = '<div style="color:#777; font-size:13px;">動画の取得に失敗しました。</div>';
+            }
         }
 
         async function fetchComments(videoId) {
