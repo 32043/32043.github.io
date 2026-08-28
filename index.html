@@ -3,8 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>YouTube Search & Player (Supabase Sync)</title>
-    <!-- Supabase クライアントライブラリ -->
+    <title>YouTube Search & Player (Multi-Key Selector)</title>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
         body {
@@ -38,7 +37,7 @@
         .search-box {
             display: flex;
             flex: 1;
-            max-width: 600px;
+            max-width: 500px;
         }
         .api-setting-box {
             display: flex;
@@ -49,13 +48,24 @@
             border-radius: 20px;
             border: 1px solid #333;
         }
+        .api-setting-box select {
+            background: #121212;
+            border: 1px solid #333;
+            color: #fff;
+            font-size: 12px;
+            outline: none;
+            padding: 4px 8px;
+            border-radius: 12px;
+            max-width: 150px;
+            text-overflow: ellipsis;
+        }
         .api-setting-box input {
             background: transparent;
             border: none;
             color: #fff;
             font-size: 12px;
             outline: none;
-            width: 130px;
+            width: 110px;
         }
         .api-setting-box button {
             padding: 4px 10px;
@@ -181,8 +191,9 @@
             </div>
 
             <div class="api-setting-box">
-                <input type="password" id="custom-api-key" placeholder="APIキー変更">
-                <button id="save-key-btn">設定</button>
+                <select id="api-key-select"></select>
+                <input type="password" id="custom-api-key" placeholder="新しいキーを追加">
+                <button id="add-key-btn">追加</button>
             </div>
 
             <div class="quota-status" id="quota-display">
@@ -211,22 +222,45 @@
     </main>
 
     <script>
-        // Supabase の接続情報（入力いただいた値を設定済み）
+        // Supabase の接続情報
         const SUPABASE_URL = 'https://ocdsoyiwtrmszhrxunlp.supabase.co';
         const SUPABASE_ANON_KEY = 'sb_publishable_pCr70-GWTlUqTgztEy3etw_xdXa3Fta';
         const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-        const apiKeys = [
+        // デフォルトの3つのAPIキー
+        const defaultApiKeys = [
             'AIzaSyDAzdoUdu5dbttA45r2L3DDUoK-3dsclzo',
             'AIzaSyClEDJSaDPk_Y76JH1xDxKd7vA2Bra_d24',
             'AIzaSyDgu8NNPC9UJtYF6fvupEvLMa6sJJmqaKI'
         ];
 
-        let activeApiKey = localStorage.getItem('youtube_custom_api_key') || apiKeys[0];
+        // ローカルストレージからカスタム追加されたキーがあれば結合、なければデフォルトのみ
+        let storedCustomKeys = JSON.parse(localStorage.getItem('youtube_all_custom_keys') || '[]');
+        let allApiKeys = [...new Set([...defaultApiKeys, ...storedCustomKeys])];
+
+        let activeApiKey = localStorage.getItem('youtube_active_api_key') || allApiKeys[0];
         let currentUsedQuota = 0;
         const MAX_QUOTA = 10000;
 
-        // Supabaseから現在のAPIキーの消費量を取得する
+        const apiKeySelect = document.getElementById('api-key-select');
+
+        // プルダウンの選択肢を再構築する関数
+        function updateApiKeyDropdown() {
+            apiKeySelect.innerHTML = '';
+            allApiKeys.forEach((key, index) => {
+                const option = document.createElement('option');
+                option.value = key;
+                // キーの一部（最初と最後）を表示名として分かりやすくする
+                const maskedKey = `${key.substring(0, 6)}...${key.substring(key.length - 4)}`;
+                option.textContent = `Key ${index + 1} (${maskedKey})`;
+                if (key === activeApiKey) {
+                    option.selected = true;
+                }
+                apiKeySelect.appendChild(option);
+            });
+        }
+
+        // Supabaseから現在選択中のAPIキーの消費量を取得する
         async function fetchQuotaFromSupabase() {
             const { data, error } = await supabaseClient
                 .from('api_quotas')
@@ -237,7 +271,6 @@
             if (data) {
                 currentUsedQuota = data.used_quota;
             } else {
-                // データがなければ新規登録
                 await supabaseClient.from('api_quotas').insert([{ api_key: activeApiKey, used_quota: 0 }]);
                 currentUsedQuota = 0;
             }
@@ -249,7 +282,6 @@
             currentUsedQuota += amount;
             updateQuotaDisplay();
 
-            // Supabase側のデータをUPSERT（存在すれば更新、なければ挿入）
             await supabaseClient
                 .from('api_quotas')
                 .upsert({ api_key: activeApiKey, used_quota: currentUsedQuota, updated_at: new Date() }, { onConflict: 'api_key' });
@@ -260,18 +292,33 @@
             document.getElementById('quota-display').textContent = `残り枠: 約 ${remaining} / ${MAX_QUOTA}`;
         }
 
-        // 初期化時にSupabaseからクォータを取得
+        // 初期化実行
+        updateApiKeyDropdown();
         fetchQuotaFromSupabase();
 
-        // APIキー変更時の処理
-        document.getElementById('save-key-btn').addEventListener('click', async () => {
+        // プルダウンでキーが変更されたとき
+        apiKeySelect.addEventListener('change', async (e) => {
+            activeApiKey = e.target.value;
+            localStorage.setItem('youtube_active_api_key', activeApiKey);
+            await fetchQuotaFromSupabase();
+        });
+
+        // 新しいAPIキーを追加するボタンの処理
+        document.getElementById('add-key-btn').addEventListener('click', async () => {
             const newKey = document.getElementById('custom-api-key').value.trim();
             if (newKey) {
+                if (!allApiKeys.includes(newKey)) {
+                    allApiKeys.push(newKey);
+                    storedCustomKeys.push(newKey);
+                    localStorage.setItem('youtube_all_custom_keys', JSON.stringify(storedCustomKeys));
+                }
                 activeApiKey = newKey;
-                localStorage.setItem('youtube_custom_api_key', newKey);
+                localStorage.setItem('youtube_active_api_key', activeApiKey);
                 document.getElementById('custom-api-key').value = '';
+
+                updateApiKeyDropdown();
                 await fetchQuotaFromSupabase();
-                alert('APIキーを切り替えました！');
+                alert('新しいAPIキーを追加して選択しました！');
             } else {
                 alert('有効なAPIキーを入力してください');
             }
@@ -413,7 +460,6 @@
                 const initial = channelTitle.charAt(0).toUpperCase();
 
                 const card = document.createElement('div');
-                card.className, 'video-card';
                 card.className = 'video-card';
                 card.innerHTML = `
                     <img class="thumb" src="${thumbnail}" alt="${title}">
