@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <title>Custom Browser</title>
+    <style>
+        body { font-family: sans-serif; margin: 0; padding: 20px; background: #f4f4f9; }
+        .container { max-width: 800px; margin: auto; }
+        .search-box { display: flex; gap: 10px; margin-bottom: 20px; }
+        input[type="text"] { flex: 1; padding: 10px; font-size: 16px; border: 1px solid #ccc; border-radius: 4px; }
+        button { padding: 10px 20px; font-size: 16px; background: #007bff; color: white; border: none; border-radius: 4px; cursor: pointer; }
+        button:hover { background: #0056b3; }
+        #viewer { width: 100%; height: 600px; border: 1px solid #ccc; background: white; border-radius: 4px; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h2>Custom Proxy Browser</h2>
+        <div class="search-box">
+            <input type="text" id="urlInput" placeholder="https://example.com を入力...">
+            <button onclick="loadPage()">閲覧</button>
+        </div>
+        <iframe id="viewer"></iframe>
+    </div>
+
+    <script>
+        async function loadPage() {
+            const rawUrl = document.getElementById('urlInput').value;
+            if (!rawUrl) return;
+
+            // RenderのバックエンドAPIのエンドポイントを指定
+            const proxyEndpoint = `https://32043-github-io.onrender.com/proxy?url=${encodeURIComponent(rawUrl)}`;
+            
+            const viewer = document.getElementById('viewer');
+            // プロキシ経由で取得したHTMLをiframeのsrcdocに流し込むことで描画
+            try {
+                const res = await fetch(proxyEndpoint);
+                const html = await res.text();
+                viewer.srcdoc = html;
+            } catch (err) {
+                alert('読み込みに失敗しました: ' + err);
+            }
+        }
+    </script>
+</body>
+</html>
