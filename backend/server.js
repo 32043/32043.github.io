@@ -25,10 +25,8 @@ app.get('/proxy', async (req, res) => {
             const parsedTarget = new URL(targetUrl);
             const currentProxyServer = `${req.protocol}://${req.get('host')}/proxy?url=`;
 
-            // CheerioでHTMLをパース
             const $ = cheerio.load(body);
 
-            // 1. すべての画像やCSS、JSなどの src や href を絶対URLに変換
             $('[src]').each((_, el) => {
                 try {
                     const src = $(el).attr('src');
@@ -36,7 +34,6 @@ app.get('/proxy', async (req, res) => {
                 } catch (e) {}
             });
 
-            // 2. リンク (href) はプロキシ経由のURLに変換
             $('a[href]').each((_, el) => {
                 try {
                     const href = $(el).attr('href');
@@ -45,7 +42,6 @@ app.get('/proxy', async (req, res) => {
                 } catch (e) {}
             });
 
-            // その他のlinkタグ（CSSなど）のhrefも絶対URLに変換
             $('link[href]').each((_, el) => {
                 try {
                     const href = $(el).attr('href');
@@ -62,33 +58,6 @@ app.get('/proxy', async (req, res) => {
 
     } catch (err) {
         res.status(500).send(`Proxy Error: ${err.message}`);
-    }
-});
-
-app.get('/search-api', async (req, res) => {
-    const query = req.query.q;
-    if (!query) {
-        return res.status(400).send('Query is required');
-    }
-
-    try {
-        const searxngUrl = `https://searx.tiekoetter.com/search?q=${encodeURIComponent(query)}&format=json`;
-        
-        const response = await fetch(searxngUrl, {
-            headers: {
-                'User-Agent': 'Mozilla/5.0'
-            }
-        });
-
-        if (!response.ok) {
-            throw new Error(`Searxng responded with status ${response.status}`);
-        }
-
-        const data = await response.json();
-        res.json(data);
-    } catch (error) {
-        console.error('Search Error:', error);
-        res.status(500).json({ error: 'Failed to fetch search results' });
     }
 });
 
