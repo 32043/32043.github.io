@@ -1,6 +1,7 @@
 const express = require('express');
 const fetch = require('node-fetch');
 const cors = require('cors');
+const cheerio = require('cheerio');
 
 const app = express();
 app.use(cors());
@@ -23,23 +24,39 @@ app.get('/proxy', async (req, res) => {
 
         if (contentType.includes('text/html')) {
             const parsedTarget = new URL(targetUrl);
-            const targetOrigin = parsedTarget.origin;
             const currentProxyServer = `${req.protocol}://${req.get('host')}/proxy?url=`;
 
-            let modifiedBody = body;
+            // CheerioでHTMLをパース
+            const $ = cheerio.load(body);
 
-            // 1. 画像やCSSなどの src や href のうち、ルート相対パス (/...) のものを絶対パスに修正
-            modifiedBody = modifiedBody.replace(/(src|href)="\/(?!\/)/g, `$1="${targetOrigin}/`);
+            // 1. すべての画像やCSS、JSなどの src や href を絶対URLに変換
+            $('[src]').each((_, el) => {
+                try {
+                    const src = $(el).attr('src');
+                    $(el).attr('src', new URL(src, targetUrl).href);
+                } catch (e) {}
+            });
 
-            // 2. リンク (href) のみ、プロキシ経由のURLに書き換える（データリンクやアンカー等は除外）
-            modifiedBody = modifiedBody.replace(/href="(https?:\/\/[^"]+)"/g, (match, url) => {
-                // すでにプロキシ済みのものや特殊なリンクはそのまま
-                if (url.includes('onrender.com')) return match;
-                return `href="${currentProxyServer}${encodeURIComponent(url)}"`;
+            // 2. リンク (href) はプロキシ経由のURLに変換
+            $('a[href]').each((_, el) => {
+                try {
+                    const href = $(el).attr('href');
+                    const absoluteUrl = new URL(href, targetUrl).href;
+                    // 内部リンクなどをプロキシURLでラップ
+                    $(el).attr('href', `${currentProxyServer}${encodeURIComponent(absoluteUrl)}`);
+                } catch (e) {}
+            });
+
+            // その他のlinkタグ（CSSなど）のhrefも絶対URLに変換
+            $('link[href]').each((_, el) => {
+                try {
+                    const href = $(el).attr('href');
+                    $(el).attr('href', new URL(href, targetUrl).href);
+                } catch (e) {}
             });
 
             res.setHeader('Content-Type', 'text/html; charset=utf-8');
-            return res.send(modifiedBody);
+            return res.send($.html());
         }
 
         res.setHeader('Content-Type', contentType);
