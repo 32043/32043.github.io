@@ -92,8 +92,8 @@
                 // ドメインっぽい文字列（例: example.com）ならhttpsを補う
                 targetUrl = 'https://' + inputVal;
             } else {
-                // それ以外はすべてGoogle検索のURLに変換する
-                targetUrl = 'https://www.google.com/search?q=' + encodeURIComponent(inputVal);
+
+                targetUrl = 'https://html.duckduckgo.com/html/?q=' + encodeURIComponent(inputVal);
             }
 
             // プロキシ経由でiframeに読み込ませる
