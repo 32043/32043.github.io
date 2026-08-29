@@ -68,15 +68,15 @@
         <button class="secondary-btn" onclick="goBack()">←</button>
         <button class="secondary-btn" onclick="goForward()">→</button>
         <button class="secondary-btn" onclick="reloadPage()">↻</button>
-        <input type="text" id="urlInput" placeholder="URLまたは検索キーワードを入力してEnter..." onkeypress="handleKeyPress(event)">
-        <button onclick="loadPage()">移動</button>
+        <input type="text" id="urlInput" placeholder="URLまたはGoogle検索ワードを入力してEnter..." onkeypress="handleKeyPress(event)">
+        <button onclick="loadPage()">検索・移動</button>
         <button class="secondary-btn" onclick="openInBlank()">about:blankで隠す</button>
     </div>
 
     <iframe id="viewer"></iframe>
 
     <script>
-        // ご自身のRenderバックエンドのURLを指定
+        // ご自身のRenderバックエンドのURL
         const RENDER_PROXY_URL = 'https://browser-32043.onrender.com/proxy?url=';
 
         function loadPage() {
@@ -85,17 +85,18 @@
 
             let targetUrl = inputVal;
 
-            // URLの形式でない場合（スペースなしのキーワード等）は検索エンジン経由にするか判定
-            if (!inputVal.startsWith('http://') && !inputVal.startsWith('https://')) {
-                // ドメイン形式っぽければhttpsを補う、違えばDuckDuckGo検索にする
-                if (inputVal.includes('.') && !inputVal.includes(' ')) {
-                    targetUrl = 'https://' + inputVal;
-                } else {
-                    targetUrl = 'https://html.duckduckgo.com/html/?q=' + encodeURIComponent(inputVal);
-                }
+            // 入力値がURL形式か、検索キーワードかを判定する
+            if (inputVal.startsWith('http://') || inputVal.startsWith('https://')) {
+                targetUrl = inputVal;
+            } else if (inputVal.includes('.') && !inputVal.includes(' ')) {
+                // ドメインっぽい文字列（例: example.com）ならhttpsを補う
+                targetUrl = 'https://' + inputVal;
+            } else {
+                // それ以外はすべてGoogle検索のURLに変換する
+                targetUrl = 'https://www.google.com/search?q=' + encodeURIComponent(inputVal);
             }
 
-            // プロキシURLを組み立ててiframeのsrcに直接設定
+            // プロキシ経由でiframeに読み込ませる
             document.getElementById('viewer').src = RENDER_PROXY_URL + encodeURIComponent(targetUrl);
         }
 
@@ -132,7 +133,6 @@
             doc.open();
             doc.write(document.documentElement.outerHTML);
             doc.close();
-            // 元のタブ側を適当なページに飛ばすか閉じるなど
         }
     </script>
 </body>
