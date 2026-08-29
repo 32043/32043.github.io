@@ -54,7 +54,7 @@
         .secondary-btn:hover {
             background: #555;
         }
-        iframe {
+        #viewer {
             flex: 1;
             width: 100%;
             border: none;
@@ -79,22 +79,74 @@
         const RENDER_BASE_URL = 'https://browser-32043.onrender.com';
         const RENDER_PROXY_URL = RENDER_BASE_URL + '/proxy?url=';
 
-        function loadPage() {
+        async function loadPage() {
             let inputVal = document.getElementById('urlInput').value.trim();
             if (!inputVal) return;
 
-            let targetUrl = inputVal;
+            let iframe = document.getElementById('viewer');
 
             if (inputVal.startsWith('http://') || inputVal.startsWith('https://')) {
-                targetUrl = inputVal;
+                iframe.src = RENDER_PROXY_URL + encodeURIComponent(inputVal);
             } else if (inputVal.includes('.') && !inputVal.includes(' ')) {
-                targetUrl = 'https://' + inputVal;
+                iframe.src = RENDER_PROXY_URL + encodeURIComponent('https://' + inputVal);
             } else {
-                // キーワードの場合はDuckDuckGoの検索URLをプロキシ経由で開く
-                targetUrl = 'https://duckduckgo.com/?q=' + encodeURIComponent(inputVal);
-            }
+                // キーワード検索の場合は自作APIを叩いてHTMLを生成してiframeに流し込む
+                try {
+                    let res = await fetch(`${RENDER_BASE_URL}/search-api?q=${encodeURIComponent(inputVal)}`);
+                    let data = await res.json();
 
-            document.getElementById('viewer').src = RENDER_PROXY_URL + encodeURIComponent(targetUrl);
+                    // 検索結果のHTMLを組み立てる
+                    let htmlContent = `
+                        <html>
+                        <head>
+                            <style>
+                                body { font-family: sans-serif; padding: 20px; background: #f9f9f9; color: #333; }
+                                h2 { color: #007bff; }
+                                .result-item { background: #fff; padding: 15px; margin-bottom: 10px; border-radius: 6px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
+                                a { color: #0066cc; text-decoration: none; font-size: 18px; }
+                                a:hover { text-decoration: underline; }
+                                p { margin: 5px 0 0 0; color: #555; font-size: 14px; }
+                            </style>
+                        </head>
+                        <body>
+                            <h2>「${inputVal}」の検索結果</h2>
+                    `;
+
+                    if (data.AbstractText) {
+                        htmlContent += `
+                            <div class="result-item">
+                                <a href="${RENDER_PROXY_URL + encodeURIComponent(data.AbstractURL)}">${data.Heading || '概要'}</a>
+                                <p>${data.AbstractText}</p>
+                            </div>
+                        `;
+                    }
+
+                    if (data.RelatedTopics && data.RelatedTopics.length > 0) {
+                        data.RelatedTopics.forEach(item => {
+                            if (item.Text && item.FirstURL) {
+                                htmlContent += `
+                                    <div class="result-item">
+                                        <a href="${RENDER_PROXY_URL + encodeURIComponent(item.FirstURL)}">${item.Text}</a>
+                                    </div>
+                                `;
+                            }
+                        });
+                    } else if (!data.AbstractText) {
+                        htmlContent += `<p>関連する結果が見つかりませんでした。「${inputVal}」で直接Googleや他のサイトを探してみてください。</p>`;
+                    }
+
+                    htmlContent += `</body></html>`;
+
+                    // iframeに生成したHTMLを書き込む
+                    let doc = iframe.contentDocument || iframe.contentWindow.document;
+                    doc.open();
+                    doc.write(htmlContent);
+                    doc.close();
+
+                } catch (e) {
+                    alert('検索の取得に失敗しました。');
+                }
+            }
         }
 
         function handleKeyPress(e) {
