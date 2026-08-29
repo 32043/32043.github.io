@@ -70,9 +70,6 @@ app.get('/proxy', async (req, res) => {
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => console.log(`Proxy server running on port ${PORT}`));
 
-// SearXNGのJSON APIを中継するエンドポイント
-const fetch = require('node-fetch');
-
 app.get('/search-api', async (req, res) => {
     const query = req.query.q;
     if (!query) {
