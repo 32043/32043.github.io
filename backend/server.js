@@ -1,5 +1,4 @@
 const express = require('express');
-const fetch = require('node-fetch');
 const cors = require('cors');
 const cheerio = require('cheerio');
 
@@ -42,7 +41,6 @@ app.get('/proxy', async (req, res) => {
                 try {
                     const href = $(el).attr('href');
                     const absoluteUrl = new URL(href, targetUrl).href;
-                    // 内部リンクなどをプロキシURLでラップ
                     $(el).attr('href', `${currentProxyServer}${encodeURIComponent(absoluteUrl)}`);
                 } catch (e) {}
             });
@@ -67,9 +65,6 @@ app.get('/proxy', async (req, res) => {
     }
 });
 
-const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => console.log(`Proxy server running on port ${PORT}`));
-
 app.get('/search-api', async (req, res) => {
     const query = req.query.q;
     if (!query) {
@@ -77,7 +72,8 @@ app.get('/search-api', async (req, res) => {
     }
 
     try {
-        const searxngUrl = `https://searx.be/search?q=${encodeURIComponent(query)}&format=json`;
+        // 稼働している別のSearXNGインスタンスを指定
+        const searxngUrl = `https://search.ononoki.org/search?q=${encodeURIComponent(query)}&format=json`;
         
         const response = await fetch(searxngUrl, {
             headers: {
@@ -96,3 +92,6 @@ app.get('/search-api', async (req, res) => {
         res.status(500).json({ error: 'Failed to fetch search results' });
     }
 });
+
+const PORT = process.env.PORT || 3000;
+app.listen(PORT, () => console.log(`Proxy server running on port ${PORT}`));
