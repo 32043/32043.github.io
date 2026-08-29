@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>YouTube Search & Player (Accessible Channel Click)</title>
+    <title>YouTube</title>
     <!-- Supabase クライアントライブラリ -->
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
@@ -174,14 +174,13 @@
         .video-card img.thumb { width: 100%; aspect-ratio: 16 / 9; object-fit: cover; cursor: pointer; }
         .video-info { padding: 12px; display: flex; gap: 12px; align-items: flex-start; }
         
-        /* チャンネルエリア全体を一つの押しやすいグループにする */
         .channel-area {
             display: flex;
             align-items: center;
             gap: 10px;
             cursor: pointer;
             padding: 6px 8px;
-            margin: -6px -8px; /* パディング相殺 */
+            margin: -6px -8px;
             border-radius: 8px;
             transition: background-color 0.2s;
         }
@@ -199,7 +198,6 @@
         
         .placeholder-text { text-align: center; color: #777; grid-column: span 3; padding: 40px; }
 
-        /* チャンネル詳細モーダルウィンドウ */
         #channel-modal {
             display: none;
             position: fixed;
@@ -382,16 +380,27 @@
         }
 
         async function fetchQuotaFromSupabase() {
+            const todayStr = new Date().toLocaleDateString('ja-JP', { timeZone: 'Asia/Tokyo' });
+            
             const { data } = await supabaseClient
                 .from('api_quotas')
-                .select('used_quota')
+                .select('used_quota, updated_at')
                 .eq('api_key', activeApiKey)
                 .single();
 
             if (data) {
-                currentUsedQuota = data.used_quota;
+                const lastDate = data.updated_at ? new Date(data.updated_at).toLocaleDateString('ja-JP', { timeZone: 'Asia/Tokyo' }) : '';
+
+                if (lastDate !== todayStr) {
+                    currentUsedQuota = 0;
+                    await supabaseClient
+                        .from('api_quotas')
+                        .upsert({ api_key: activeApiKey, used_quota: 0, updated_at: new Date() }, { onConflict: 'api_key' });
+                } else {
+                    currentUsedQuota = data.used_quota;
+                }
             } else {
-                await supabaseClient.from('api_quotas').insert([{ api_key: activeApiKey, used_quota: 0 }]);
+                await supabaseClient.from('api_quotas').insert([{ api_key: activeApiKey, used_quota: 0, updated_at: new Date() }]);
                 currentUsedQuota = 0;
             }
             updateQuotaDisplay();
@@ -615,11 +624,9 @@
                     </div>
                 `;
 
-                // サムネイルとタイトルクリックで動画再生
                 card.querySelector('.thumb').addEventListener('click', () => playVideo(videoId, title, channelTitle, channelId));
                 card.querySelector('.video-title').addEventListener('click', () => playVideo(videoId, title, channelTitle, channelId));
 
-                // チャンネルエリア（アイコン＋名前＋メタ情報を含んだブロック全体）をタップ・クリックでモーダルを開くように変更
                 card.querySelector('.channel-area').addEventListener('click', () => {
                     openChannelModal(channelId, channelTitle);
                 });
