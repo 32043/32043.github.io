@@ -28,13 +28,14 @@ app.get('/proxy', async (req, res) => {
 
             let modifiedBody = body;
 
-            // 1. 絶対パス (/で始まるもの) を元のサイトの絶対URLに置換
-            modifiedBody = modifiedBody.replace(/(href|src|action)="\/(?!\/)/g, `$1="${targetOrigin}/`);
+            // 1. 画像やCSSなどの src や href のうち、ルート相対パス (/...) のものを絶対パスに修正
+            modifiedBody = modifiedBody.replace(/(src|href)="\/(?!\/)/g, `$1="${targetOrigin}/`);
 
-            // 2. ページ内のすべてのリンクやアクションをプロキシ経由に書き換える
-            // 例: href="https://ja.wikipedia.org/..." -> href="https://your-render.onrender.com/proxy?url=https%3A%2F%2Fja.wikipedia.org%2F..."
-            modifiedBody = modifiedBody.replace(/(href|action)="(https?:\/\/[^"]+)"/g, (match, attr, url) => {
-                return `${attr}="${currentProxyServer}${encodeURIComponent(url)}"`;
+            // 2. リンク (href) のみ、プロキシ経由のURLに書き換える（データリンクやアンカー等は除外）
+            modifiedBody = modifiedBody.replace(/href="(https?:\/\/[^"]+)"/g, (match, url) => {
+                // すでにプロキシ済みのものや特殊なリンクはそのまま
+                if (url.includes('onrender.com')) return match;
+                return `href="${currentProxyServer}${encodeURIComponent(url)}"`;
             });
 
             res.setHeader('Content-Type', 'text/html; charset=utf-8');
