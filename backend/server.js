@@ -69,3 +69,33 @@ app.get('/proxy', async (req, res) => {
 
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => console.log(`Proxy server running on port ${PORT}`));
+
+// SearXNGのJSON APIを中継するエンドポイント
+const fetch = require('node-fetch');
+
+app.get('/search-api', async (req, res) => {
+    const query = req.query.q;
+    if (!query) {
+        return res.status(400).send('Query is required');
+    }
+
+    try {
+        const searxngUrl = `https://searx.be/search?q=${encodeURIComponent(query)}&format=json`;
+        
+        const response = await fetch(searxngUrl, {
+            headers: {
+                'User-Agent': 'Mozilla/5.0'
+            }
+        });
+
+        if (!response.ok) {
+            throw new Error(`Searxng responded with status ${response.status}`);
+        }
+
+        const data = await response.json();
+        res.json(data);
+    } catch (error) {
+        console.error('Search Error:', error);
+        res.status(500).json({ error: 'Failed to fetch search results' });
+    }
+});
