@@ -21,25 +21,26 @@ app.get('/proxy', async (req, res) => {
         const contentType = response.headers.get('content-type') || '';
         const body = await response.text();
 
-        // HTMLの場合のみ、相対パスを絶対パスに置換してCSSや画像が読み込めるようにする
         if (contentType.includes('text/html')) {
             const parsedTarget = new URL(targetUrl);
             const targetOrigin = parsedTarget.origin;
-            const targetBasePath = targetOrigin + parsedTarget.pathname.substring(0, parsedTarget.pathname.lastIndexOf('/') + 1);
+            const currentProxyServer = `${req.protocol}://${req.get('host')}/proxy?url=`;
 
             let modifiedBody = body;
 
-            // 1. / で始まるルート相対パス (例: /w/load.php) を targetOrigin + パス に置換
+            // 1. 絶対パス (/で始まるもの) を元のサイトの絶対URLに置換
             modifiedBody = modifiedBody.replace(/(href|src|action)="\/(?!\/)/g, `$1="${targetOrigin}/`);
-            
-            // 2. ./ またはパスなしの相対パス (例: style.css, ./img/a.png) の簡易対応
-            // ※完全に網羅するのは難しいため、主要なアセット読み込みをベースに絶対パス化
+
+            // 2. ページ内のすべてのリンクやアクションをプロキシ経由に書き換える
+            // 例: href="https://ja.wikipedia.org/..." -> href="https://your-render.onrender.com/proxy?url=https%3A%2F%2Fja.wikipedia.org%2F..."
+            modifiedBody = modifiedBody.replace(/(href|action)="(https?:\/\/[^"]+)"/g, (match, attr, url) => {
+                return `${attr}="${currentProxyServer}${encodeURIComponent(url)}"`;
+            });
 
             res.setHeader('Content-Type', 'text/html; charset=utf-8');
             return res.send(modifiedBody);
         }
 
-        // HTML以外のファイル（CSSや画像など）はそのままスルーして返す
         res.setHeader('Content-Type', contentType);
         res.send(body);
 
