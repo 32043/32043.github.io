@@ -5,6 +5,7 @@ const cheerio = require('cheerio');
 const app = express();
 app.use(cors());
 
+// 通常のプロキシエンドポイント
 app.get('/proxy', async (req, res) => {
     const targetUrl = req.query.url;
     if (!targetUrl) {
@@ -58,6 +59,35 @@ app.get('/proxy', async (req, res) => {
 
     } catch (err) {
         res.status(500).send(`Proxy Error: ${err.message}`);
+    }
+});
+
+// HTML生成用の検索APIエンドポイント（DuckDuckGoのInstant Answer API等を利用）
+app.get('/search-api', async (req, res) => {
+    const query = req.query.q;
+    if (!query) {
+        return res.status(400).json({ error: 'Query is required' });
+    }
+
+    try {
+        // DuckDuckGoのAPIを使用（format=json）
+        const ddgUrl = `https://api.duckduckgo.com/?q=${encodeURIComponent(query)}&format=json&no_html=1&skip_disambig=1`;
+        
+        const response = await fetch(ddgUrl, {
+            headers: {
+                'User-Agent': 'Mozilla/5.0'
+            }
+        });
+
+        if (!response.ok) {
+            throw new Error(`API responded with status ${response.status}`);
+        }
+
+        const data = await response.json();
+        res.json(data);
+    } catch (error) {
+        console.error('Search Error:', error);
+        res.status(500).json({ error: 'Failed to fetch search results' });
     }
 });
 
