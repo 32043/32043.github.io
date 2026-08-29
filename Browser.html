@@ -2,7 +2,7 @@
 <html lang="ja">
 <head>
     <meta charset="UTF-8">
-    <title>Browser</title>
+    <title>Custom Proxy Browser</title>
     <style>
         body, html {
             margin: 0;
@@ -90,7 +90,8 @@
             } else if (inputVal.includes('.') && !inputVal.includes(' ')) {
                 targetUrl = 'https://' + inputVal;
             } else {
-                targetUrl = RENDER_BASE_URL + '/search-api?q=' + encodeURIComponent(inputVal);
+                // キーワードの場合はDuckDuckGoの検索URLをプロキシ経由で開く
+                targetUrl = 'https://duckduckgo.com/?q=' + encodeURIComponent(inputVal);
             }
 
             document.getElementById('viewer').src = RENDER_PROXY_URL + encodeURIComponent(targetUrl);
