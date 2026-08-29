@@ -72,8 +72,7 @@ app.get('/search-api', async (req, res) => {
     }
 
     try {
-        // 稼働している別のSearXNGインスタンスを指定
-        const searxngUrl = `https://search.ononoki.org/search?q=${encodeURIComponent(query)}&format=json`;
+        const searxngUrl = `https://searx.tiekoetter.com/search?q=${encodeURIComponent(query)}&format=json`;
         
         const response = await fetch(searxngUrl, {
             headers: {
