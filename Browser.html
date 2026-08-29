@@ -2,44 +2,137 @@
 <html lang="ja">
 <head>
     <meta charset="UTF-8">
-    <title>Custom Browser</title>
+    <title>Custom Proxy Browser</title>
     <style>
-        body { font-family: sans-serif; margin: 0; padding: 20px; background: #f4f4f9; }
-        .container { max-width: 800px; margin: auto; }
-        .search-box { display: flex; gap: 10px; margin-bottom: 20px; }
-        input[type="text"] { flex: 1; padding: 10px; font-size: 16px; border: 1px solid #ccc; border-radius: 4px; }
-        button { padding: 10px 20px; font-size: 16px; background: #007bff; color: white; border: none; border-radius: 4px; cursor: pointer; }
-        button:hover { background: #0056b3; }
-        #viewer { width: 100%; height: 600px; border: 1px solid #ccc; background: white; border-radius: 4px; }
+        body, html {
+            margin: 0;
+            padding: 0;
+            height: 100%;
+            font-family: sans-serif;
+            background: #1a1a1a;
+            color: #fff;
+            display: flex;
+            flex-direction: column;
+        }
+        .toolbar {
+            display: flex;
+            padding: 10px;
+            background: #2c2c2c;
+            gap: 10px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.3);
+            z-index: 10;
+        }
+        input[type="text"] {
+            flex: 1;
+            padding: 8px 12px;
+            font-size: 15px;
+            border: 1px solid #444;
+            border-radius: 4px;
+            background: #1e1e1e;
+            color: #fff;
+            outline: none;
+        }
+        input[type="text"]:focus {
+            border-color: #007bff;
+        }
+        button {
+            padding: 8px 16px;
+            font-size: 15px;
+            background: #007bff;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: bold;
+        }
+        button:hover {
+            background: #0056b3;
+        }
+        .secondary-btn {
+            background: #444;
+        }
+        .secondary-btn:hover {
+            background: #555;
+        }
+        iframe {
+            flex: 1;
+            width: 100%;
+            border: none;
+            background: white;
+        }
     </style>
 </head>
 <body>
-    <div class="container">
-        <h2>Custom Proxy Browser</h2>
-        <div class="search-box">
-            <input type="text" id="urlInput" placeholder="https://example.com を入力...">
-            <button onclick="loadPage()">閲覧</button>
-        </div>
-        <iframe id="viewer"></iframe>
+
+    <div class="toolbar">
+        <button class="secondary-btn" onclick="goBack()">←</button>
+        <button class="secondary-btn" onclick="goForward()">→</button>
+        <button class="secondary-btn" onclick="reloadPage()">↻</button>
+        <input type="text" id="urlInput" placeholder="URLまたは検索キーワードを入力してEnter..." onkeypress="handleKeyPress(event)">
+        <button onclick="loadPage()">移動</button>
+        <button class="secondary-btn" onclick="openInBlank()">about:blankで隠す</button>
     </div>
 
-    <script>
-        async function loadPage() {
-            const rawUrl = document.getElementById('urlInput').value;
-            if (!rawUrl) return;
+    <iframe id="viewer"></iframe>
 
-            // RenderのバックエンドAPIのエンドポイントを指定
-            const proxyEndpoint = `https://32043-github-io.onrender.com/proxy?url=${encodeURIComponent(rawUrl)}`;
-            
-            const viewer = document.getElementById('viewer');
-            // プロキシ経由で取得したHTMLをiframeのsrcdocに流し込むことで描画
-            try {
-                const res = await fetch(proxyEndpoint);
-                const html = await res.text();
-                viewer.srcdoc = html;
-            } catch (err) {
-                alert('読み込みに失敗しました: ' + err);
+    <script>
+        // ご自身のRenderバックエンドのURLを指定
+        const RENDER_PROXY_URL = 'https://browser-32043.onrender.com/proxy?url=';
+
+        function loadPage() {
+            let inputVal = document.getElementById('urlInput').value.trim();
+            if (!inputVal) return;
+
+            let targetUrl = inputVal;
+
+            // URLの形式でない場合（スペースなしのキーワード等）は検索エンジン経由にするか判定
+            if (!inputVal.startsWith('http://') && !inputVal.startsWith('https://')) {
+                // ドメイン形式っぽければhttpsを補う、違えばDuckDuckGo検索にする
+                if (inputVal.includes('.') && !inputVal.includes(' ')) {
+                    targetUrl = 'https://' + inputVal;
+                } else {
+                    targetUrl = 'https://html.duckduckgo.com/html/?q=' + encodeURIComponent(inputVal);
+                }
             }
+
+            // プロキシURLを組み立ててiframeのsrcに直接設定
+            document.getElementById('viewer').src = RENDER_PROXY_URL + encodeURIComponent(targetUrl);
+        }
+
+        function handleKeyPress(e) {
+            if (e.key === 'Enter') {
+                loadPage();
+            }
+        }
+
+        function goBack() {
+            try {
+                document.getElementById('viewer').contentWindow.history.back();
+            } catch(e) {}
+        }
+
+        function goForward() {
+            try {
+                document.getElementById('viewer').contentWindow.history.forward();
+            } catch(e) {}
+        }
+
+        function reloadPage() {
+            let iframe = document.getElementById('viewer');
+            iframe.src = iframe.src;
+        }
+
+        function openInBlank() {
+            let win = window.open('about:blank');
+            if (!win) {
+                alert('ポップアップがブロックされました。');
+                return;
+            }
+            let doc = win.document;
+            doc.open();
+            doc.write(document.documentElement.outerHTML);
+            doc.close();
+            // 元のタブ側を適当なページに飛ばすか閉じるなど
         }
     </script>
 </body>
